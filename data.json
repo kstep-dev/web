@@ -1,0 +1,226 @@
+{
+ "version": "8696a17-202609121209",
+ "bugs": [
+  {
+   "name": "sync_wakeup",
+   "num_cpus": 3,
+   "mem_mb": 128,
+   "driver_url": "https://github.com/kstep-dev/kstep/blob/master/kmod/drivers/sync_wakeup.c",
+   "fixes": [
+    {
+     "label": "linux@aa3ee4f",
+     "url": "https://github.com/torvalds/linux/commit/aa3ee4f0b7541382c9f6f43f7408d73a5d4f4042"
+    },
+    {
+     "label": "sync_wakeup.patch",
+     "url": "https://github.com/kstep-dev/kstep/blob/master/linux/sync_wakeup.patch"
+    }
+   ],
+   "plot": "https://raw.githubusercontent.com/kstep-dev/results/main/repro_sync_wakeup/plot.png"
+  },
+  {
+   "name": "vruntime_overflow",
+   "num_cpus": 2,
+   "mem_mb": 128,
+   "driver_url": "https://github.com/kstep-dev/kstep/blob/master/kmod/drivers/vruntime_overflow.c",
+   "fixes": [
+    {
+     "label": "linux@bbce3de",
+     "url": "https://github.com/torvalds/linux/commit/bbce3de72be56e4b5f68924b7da9630cc89aa1a8"
+    }
+   ],
+   "plot": "https://raw.githubusercontent.com/kstep-dev/results/main/repro_vruntime_overflow/plot.png"
+  },
+  {
+   "name": "freeze",
+   "num_cpus": 2,
+   "mem_mb": 128,
+   "driver_url": "https://github.com/kstep-dev/kstep/blob/master/kmod/drivers/freeze.c",
+   "fixes": [
+    {
+     "label": "linux@cd9626e",
+     "url": "https://github.com/torvalds/linux/commit/cd9626e9ebc77edec33023fe95dab4b04ffc819d"
+    }
+   ],
+   "plot": "https://raw.githubusercontent.com/kstep-dev/results/main/repro_freeze/plot.png"
+  },
+  {
+   "name": "extra_balance",
+   "num_cpus": 5,
+   "mem_mb": 128,
+   "driver_url": "https://github.com/kstep-dev/kstep/blob/master/kmod/drivers/extra_balance.c",
+   "fixes": [
+    {
+     "label": "linux@6d7e478",
+     "url": "https://github.com/torvalds/linux/commit/6d7e4782bcf549221b4ccfffec2cf4d1a473f1a3"
+    }
+   ],
+   "plot": "https://raw.githubusercontent.com/kstep-dev/results/main/repro_extra_balance/plot.png"
+  },
+  {
+   "name": "util_avg",
+   "num_cpus": 2,
+   "mem_mb": 128,
+   "driver_url": "https://github.com/kstep-dev/kstep/blob/master/kmod/drivers/util_avg.c",
+   "fixes": [
+    {
+     "label": "linux@17e3e88",
+     "url": "https://github.com/torvalds/linux/commit/17e3e88ed0b6318fde0d1c14df1a804711cab1b5"
+    }
+   ],
+   "plot": "https://raw.githubusercontent.com/kstep-dev/results/main/repro_util_avg/plot.png"
+  },
+  {
+   "name": "long_balance",
+   "num_cpus": 3,
+   "mem_mb": 4096,
+   "driver_url": "https://github.com/kstep-dev/kstep/blob/master/kmod/drivers/long_balance.c",
+   "fixes": [
+    {
+     "label": "linux@2feab24",
+     "url": "https://github.com/torvalds/linux/commit/2feab2492deb2f14f9675dd6388e9e2bf669c27a"
+    }
+   ],
+   "plot": "https://raw.githubusercontent.com/kstep-dev/results/main/repro_long_balance/plot.png"
+  },
+  {
+   "name": "lag_vruntime",
+   "num_cpus": 2,
+   "mem_mb": 128,
+   "driver_url": "https://github.com/kstep-dev/kstep/blob/master/kmod/drivers/lag_vruntime.c",
+   "fixes": [
+    {
+     "label": "linux@5068d84",
+     "url": "https://github.com/torvalds/linux/commit/5068d84054b766efe7c6202fc71b2350d1c326f1"
+    }
+   ],
+   "plot": "https://raw.githubusercontent.com/kstep-dev/results/main/repro_lag_vruntime/plot.png"
+  },
+  {
+   "name": "even_idle_cpu",
+   "num_cpus": 5,
+   "mem_mb": 128,
+   "driver_url": "https://github.com/kstep-dev/kstep/blob/master/kmod/drivers_new_bugs/even_idle_cpu.c",
+   "fixes": [
+    {
+     "label": "even_idle_cpu.patch",
+     "url": "https://github.com/kstep-dev/kstep/blob/master/linux/even_idle_cpu.patch"
+    }
+   ],
+   "plot": "https://raw.githubusercontent.com/kstep-dev/results/main/repro_even_idle_cpu/plot.png"
+  },
+  {
+   "name": "local_group_imbalance",
+   "num_cpus": 5,
+   "mem_mb": 128,
+   "driver_url": "https://github.com/kstep-dev/kstep/blob/master/kmod/drivers_new_bugs/local_group_imbalance.c",
+   "fixes": [
+    {
+     "label": "fix_local_group_imbalanced.patch",
+     "url": "https://github.com/kstep-dev/kstep/blob/master/linux/fix_local_group_imbalanced.patch"
+    }
+   ],
+   "plot": "https://raw.githubusercontent.com/kstep-dev/results/main/repro_local_group_imbalance/plot.png"
+  },
+  {
+   "name": "util_avg_jump",
+   "num_cpus": 2,
+   "mem_mb": 128,
+   "driver_url": "https://github.com/kstep-dev/kstep/blob/master/kmod/drivers_new_bugs/util_avg_jump.c",
+   "fixes": [
+    {
+     "label": "fix_util_avg_jump.patch",
+     "url": "https://github.com/kstep-dev/kstep/blob/master/linux/fix_util_avg_jump.patch"
+    }
+   ],
+   "plot": "https://raw.githubusercontent.com/kstep-dev/results/main/repro_util_avg_jump/plot.png"
+  },
+  {
+   "name": "rt_runtime_toggle",
+   "num_cpus": 2,
+   "mem_mb": 128,
+   "driver_url": "https://github.com/kstep-dev/kstep/blob/master/kmod/drivers/rt_runtime_toggle.c",
+   "fixes": [
+    {
+     "label": "linux@9b58e97",
+     "url": "https://github.com/torvalds/linux/commit/9b58e976b3b391c0cf02e038d53dd0478ed3013c"
+    }
+   ],
+   "plot": "https://raw.githubusercontent.com/kstep-dev/results/main/repro_rt_runtime_toggle/plot.png"
+  },
+  {
+   "name": "uclamp_inversion",
+   "num_cpus": 2,
+   "mem_mb": 128,
+   "driver_url": "https://github.com/kstep-dev/kstep/blob/master/kmod/drivers/uclamp_inversion.c",
+   "fixes": [
+    {
+     "label": "linux@0213b70",
+     "url": "https://github.com/torvalds/linux/commit/0213b7083e81f4acd69db32cb72eb4e5f220329a"
+    }
+   ],
+   "plot": "https://raw.githubusercontent.com/kstep-dev/results/main/repro_uclamp_inversion/plot.png"
+  },
+  {
+   "name": "h_nr_runnable",
+   "num_cpus": 2,
+   "mem_mb": 128,
+   "driver_url": "https://github.com/kstep-dev/kstep/blob/master/kmod/drivers/h_nr_runnable.c",
+   "fixes": [
+    {
+     "label": "linux@3429dd5",
+     "url": "https://github.com/torvalds/linux/commit/3429dd57f0deb1a602c2624a1dd7c4c11b6c4734"
+    }
+   ],
+   "plot": "https://raw.githubusercontent.com/kstep-dev/results/main/repro_h_nr_runnable/plot.png"
+  },
+  {
+   "name": "vlag_overflow",
+   "num_cpus": 3,
+   "mem_mb": 128,
+   "driver_url": null,
+   "fixes": [],
+   "plot": null
+  },
+  {
+   "name": "throttled_limbo_list",
+   "num_cpus": 3,
+   "mem_mb": 128,
+   "driver_url": null,
+   "fixes": [],
+   "plot": null
+  },
+  {
+   "name": "slice_update",
+   "num_cpus": 2,
+   "mem_mb": 128,
+   "driver_url": null,
+   "fixes": [],
+   "plot": null
+  },
+  {
+   "name": "avg_vruntime_ceil",
+   "num_cpus": 2,
+   "mem_mb": 128,
+   "driver_url": null,
+   "fixes": [],
+   "plot": null
+  },
+  {
+   "name": "min_deadline",
+   "num_cpus": 2,
+   "mem_mb": 128,
+   "driver_url": null,
+   "fixes": [],
+   "plot": null
+  },
+  {
+   "name": "zero_vruntime",
+   "num_cpus": 2,
+   "mem_mb": 128,
+   "driver_url": null,
+   "fixes": [],
+   "plot": null
+  }
+ ]
+}

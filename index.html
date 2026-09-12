@@ -1,0 +1,709 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>kSTEP: Kernel Scheduler Test and Evaluation Platform</title>
+<link rel="stylesheet" href="style.css">
+<style>
+  td input { padding: 0 .2rem; font-size: .85rem; }
+  td input.bad { border-color: crimson; color: crimson; }
+  td select { padding: 0 .2rem; font-size: .85rem; }
+  #tasks th, #tasks td { text-align: right; font-variant-numeric: tabular-nums; }
+  #tasks th:first-child, #tasks td:first-child { text-align: left; }
+  #cpu-hint { margin: 0; }
+  #groups th, #groups td { text-align: left; }
+  /* scenario tabs: the page's navigation; everything below is the selected scenario */
+  #scenarios { display: flex; flex-wrap: wrap; gap: 0; margin: 1.2rem 0 0; border-bottom: 1px solid GrayText; }
+  #scenarios button { border: 0; border-bottom: 3px solid transparent; border-radius: 0; background: none; padding: .35rem .8rem; margin-bottom: -1px; color: GrayText; }
+  #scenarios button:hover { color: CanvasText; background: none; }
+  #scenarios button.active { color: CanvasText; font-weight: 600; border-bottom-color: AccentColor; }
+  #scenario-text { margin: .6rem 0 0; }
+  #legend { margin: .3rem 0 0; font-size: .85rem; }
+  #cpu-hint:empty { display: none; }
+  #cpu-hint.bad { color: crimson; }
+  #machine { display: flex; gap: .6rem; flex-wrap: wrap; margin: .4rem 0; }
+  .socket { border: 1px solid GrayText; border-radius: .35rem; padding: .35rem .45rem; }
+  .socket > header { font-size: .8rem; color: GrayText; margin-bottom: .3rem; }
+  .clusters { display: flex; flex-wrap: wrap; gap: .5rem; }
+  .cluster { border: 1px dashed GrayText; border-radius: .3rem; padding: .3rem .4rem; }
+  .cluster header { display: flex; gap: .5rem; align-items: center; justify-content: space-between; font-size: .8rem; color: GrayText; margin-bottom: .3rem; }
+  .cores { display: flex; flex-wrap: wrap; gap: .35rem; }
+  .core { border: 1px dotted GrayText; border-radius: .2rem; padding: 2px 3px; }
+  .core header { display: flex; gap: .3rem; align-items: center; justify-content: space-between; font-size: .7rem; color: GrayText; margin-bottom: 2px; }
+  .core select { padding: 0 .1rem; font-size: .7rem; }
+  .threads { display: flex; gap: 2px; }
+  .core span { display: inline-block; padding: .1rem .35rem; font-size: .75rem; font-variant-numeric: tabular-nums; background: color-mix(in srgb, GrayText 15%, transparent); border-radius: .15rem; }
+  #clock { display: flex; gap: .5rem; align-items: center; }
+  #timeline { display: block; width: 100%; border: 1px solid GrayText; border-bottom: 0; }
+  #scroll { overflow-x: auto; overflow-y: hidden; height: 18px; border: 1px solid GrayText; border-top: 0; }
+  #spacer { height: 1px; }
+  #bugs th { text-align: left; }
+  #bugs td { vertical-align: middle; padding: .5rem; }
+  #bugs td:last-child { width: 55%; text-align: center; }
+  #bugs img { max-height: 14rem; max-width: 100%; }
+  #bugs td div { line-height: 1.6; }
+  #cpu-stats { white-space: nowrap; }
+  #cpu-stats th { text-align: left; }
+  #cpu-stats td { font-variant-numeric: tabular-nums; }
+  #cpu-editor { margin-top: 1.4rem; }
+  #cpu-editor summary { cursor: pointer; font-weight: 600; }
+  #running-cpus, #cpu-draft { font-size: .85rem; font-weight: normal; }
+  #cpu-presets, #cpu-dimensions, #cpu-actions { display: flex; flex-wrap: wrap; gap: .6rem; margin: .6rem 0; align-items: center; }
+  #cpu-dimensions label { display: flex; flex-direction: column; gap: .2rem; font-size: .85rem; }
+  #cpu-dimensions input { width: 4rem; }
+  #kernel-logs { margin-top: 1rem; }
+  #kernel-logs summary { cursor: pointer; }
+  #kernel-logs #status { margin-left: 0; color: inherit; }
+  #kernel-logs #status.bad { color: crimson; font-weight: 600; }
+  #kernel-logs .hide-logs, #kernel-logs[open] .show-logs { display: none; }
+  #kernel-logs[open] .hide-logs { display: inline; }
+  #kernel-logs #panes { margin-top: .6rem; }
+  #boot-preview { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; margin-top: .25rem; color: GrayText; font: 12px/1.5 ui-monospace, monospace; }
+  pre .err { color: crimson; }
+  pre .event { opacity: .6; }
+</style>
+</head>
+<body>
+<header>
+  <h1>kSTEP: Kernel Scheduler Test and Evaluation Platform</h1>
+  <nav><a href="assets/paper-osdi26.pdf">Paper</a><a href="https://github.com/kstep-dev/kstep">Code</a></nav>
+</header>
+<p>kSTEP (<a href="assets/paper-osdi26.pdf">OSDI ’26</a>) runs the unmodified Linux CPU scheduler deterministically, one tick at a time, on CPUs it isolates. A Linux kernel boots below when the page loads, with kSTEP holding its scheduler clock. Nothing happens in it except what you ask for: create tasks, change their nice value or affinity, pause or kill them, pick the machine's topology, and advance the scheduler one tick at a time.</p>
+
+<nav id="scenarios" aria-label="scenarios"></nav>
+<p id="scenario-text"></p>
+
+<details id="kernel-logs">
+  <summary><span id="status" role="status">Loading kernel…</span><span id="boot-elapsed" class="hint" aria-hidden="true"></span> · <span class="show-logs">Show logs</span><span class="hide-logs">Hide logs</span><span id="boot-preview" hidden></span></summary>
+  <div id="panes">
+    <div class="pane"><h3>Kernel console</h3><pre id="console"></pre></div>
+    <div class="pane"><h3>kSTEP trace</h3><pre id="log"></pre></div>
+  </div>
+</details>
+
+<details id="cpu-editor"><summary>Topology <span id="running-cpus" class="hint"></span> <span id="cpu-draft" class="hint"></span></summary>
+<p>Choose a layout, then adjust its topology and core capacities. Restarting resets tasks, cgroups, and the timeline.</p>
+<div id="cpu-presets" role="group" aria-label="Topology presets"></div>
+<div id="cpu-dimensions">
+  <label>Sockets <input id="sockets" type="number" min="1" max="8" value="1"></label>
+  <label>Clusters per socket <input id="clusters" type="number" min="1" max="8" value="1"></label>
+  <label>Cores per cluster <input id="cores" type="number" min="1" max="8" value="2"></label>
+  <label>Threads per core <input id="threads" type="number" min="1" max="4" value="2"></label>
+</div>
+<p class="hint">Each thread is one CPU. Capacity is relative: 512 is half of a full-capacity core (1024). Threads on a core share its capacity setting.</p>
+<div id="machine"></div>
+<p id="cpu-hint" class="hint" role="status"></p>
+<div id="cpu-actions"><span id="ncpus-label"></span><button id="boot">Restart with these CPUs</button><button id="discard-cpus">Discard changes</button></div>
+</details>
+
+<h2>Timeline <span><span id="clock" hidden><label><input id="speed" type="number" min="0" max="1000" step="10" value="20" style="width:4.2rem" title="ticks per second; 0 stops the clock"> ticks/s</label>
+  <button id="step" title="stop the clock and advance exactly one tick">step</button></span></h2>
+<canvas id="timeline"></canvas>
+<div id="scroll"><div id="spacer"></div></div>
+<p class="hint" id="legend">One column per tick, a band per CPU, a row per task. <span title="a task's slice starts with a bar in the tick it migrated to this CPU (balancing or wakeup placement)">▎ migrated in</span> &nbsp; <span title="this CPU's load balancer looked for work in that tick (after should_we_balance)">┆ balancer ran</span>. Hover for details.</p>
+
+<h2>Tasks <span><button id="create" hidden>create task</button></span></h2>
+<div class="table-scroll" role="region" aria-label="Tasks" tabindex="0">
+<table id="tasks"><thead><tr><th></th><th>task</th><th>state</th><th>cpu</th><th>affinity</th><th>nice</th><th>policy</th><th>weight</th><th>runtime ms</th><th>vruntime ms</th><th>deadline ms</th><th>slice ms</th><th>cgroup</th><th></th></tr></thead><tbody></tbody></table>
+</div>
+
+<h2>Cgroups</h2>
+<div class="table-scroll" role="region" aria-label="Cgroups" tabindex="0">
+<table id="groups"><thead><tr><th>cgroup</th><th>weight</th><th>cpus</th><th>tasks</th><th></th></tr></thead><tbody></tbody></table>
+</div>
+
+<section id="cpus" aria-labelledby="cpus-title">
+<h2 id="cpus-title">CPUs</h2>
+<div class="table-scroll" role="region" aria-label="CPU statistics" tabindex="0">
+<table id="cpu-stats"><thead><tr><th>CPU</th><th>Capacity</th><th>Task</th><th title="Runqueue nr_running, including the running task; delayed dequeue can affect this count">Runnable</th><th title="Fair-class PELT utilization, on a scale where 1024 is a full CPU. Excludes real-time and deadline classes.">Fair utilization</th><th title="Fair-class weighted demand (PELT), not a task count">Fair load avg</th><th title="Fair-class PELT runnable demand; 1024 per fully runnable task">Fair runnable avg</th><th title="Root fair queue virtual clock; unavailable on kernels that removed this counter">Min vruntime ms</th><th title="Kernel cumulative context-switch counter">Context switches</th></tr></thead><tbody></tbody></table>
+</div>
+
+</section>
+
+
+
+<h2>Reproduced bugs</h2>
+<p>Each row is a real Linux CPU scheduler bug with a kSTEP driver that triggers it; the plot compares the trace of the buggy and the fixed kernel. <code>./reproduce.py &lt;bug&gt;</code> in the kSTEP repo builds both kernels and reruns the driver.</p>
+<div class="table-scroll" role="region" aria-label="Reproduced bugs" tabindex="0">
+<table id="bugs">
+  <thead><tr><th>Bug, driver, and fix</th><th>Buggy vs fixed</th></tr></thead>
+  <tbody></tbody>
+</table>
+</div>
+
+<h2>How kSTEP works</h2>
+<p>A driver program (kernel code, one per bug) declares a sequence of scheduler-invoking events: task creation, wakeups, sleeps, cgroup changes, ticks. The kSTEP module dispatches them on CPUs isolated from the rest of the system, with the scheduler clock and the tick under its control, so the unmodified scheduler runs the same code path it would in production and produces the same trace on every run. The plot in each row compares that output for the buggy and the fixed kernel.</p>
+<figure><img src="figures/arch.svg" alt="kSTEP architecture"></figure>
+<ul>
+  <li><b>Timing.</b> Logical time advances only when the driver ticks, so events can be placed inside transient windows a few microseconds wide.</li>
+  <li><b>Control.</b> Drivers create and steer tasks and cgroups, trigger kernel activities such as load balancing, and set CPU frequency and topology.</li>
+  <li><b>Determinism.</b> Mocked clocks, isolated CPUs and reset state make the same driver produce the same trace, so buggy and fixed kernels can be compared line by line.</li>
+  <li><b>Fidelity.</b> kSTEP never writes scheduler state directly; every state it reaches is reachable on a real system through the same code paths.</li>
+</ul>
+
+<h2>Paper</h2>
+<p><a href="assets/paper-osdi26.pdf">kSTEP: Characterization and Deterministic Testing of Linux CPU Scheduler Bugs</a>.
+Tingjia Cao, Shawn (Wanxiang) Zhong, Caeden Whitaker, Ke Han, Andrea C. Arpaci-Dusseau, Remzi H. Arpaci-Dusseau.
+OSDI '26.</p>
+<p>We present an in-depth study of CPU scheduler bugs, covering both functional violations and
+misalignments between implementation and policy. Our study shows that these bugs are hard to
+observe and even harder to trigger. To close this gap, we introduce kSTEP. kSTEP gives testers
+fine-grained control over scheduler-invoking events and runs them deterministically on isolated
+CPUs. kSTEP produces noise-free, repeatable traces that expose subtle behavior. We then build a
+coverage-guided fuzzer on top of kSTEP for automated CPU scheduler testing. We demonstrate
+kSTEP's effectiveness by reproducing seven real-world scheduler bugs and uncovering four new ones.</p>
+
+<h2>Resources</h2>
+<ul>
+  <li><a href="https://github.com/kstep-dev/kstep">kstep</a>: framework, drivers, fuzzer, and automation scripts.</li>
+  <li><a href="https://github.com/kstep-dev/study">study</a>: the bug study dataset and analysis.</li>
+  <li><a href="https://github.com/kstep-dev/results">results</a>: buggy and fixed traces and plots for every reproduced bug.</li>
+  <li><a href="https://github.com/kstep-dev/kstep-dev.github.io">kstep-dev.github.io</a>: this page and the WebAssembly build of QEMU behind it.</li>
+</ul>
+
+
+<script src="coi-serviceworker.min.js"></script>
+<script type="module">
+const $ = (id) => document.getElementById(id);
+const status = $('status'), log = $('log'), con = $('console'), canvas = $('timeline');
+const bootStarted = performance.now();
+let startup = true, statusTimer = 0;
+const updateElapsed = () => { $('boot-elapsed').textContent = ` · ${((performance.now() - bootStarted) / 1000).toFixed(1)} s`; };
+const setStatus = (s, bad = false, busy = false) => {
+  status.textContent = s; status.className = bad ? 'bad' : '';
+  startup = busy;
+  clearInterval(statusTimer);
+  if (busy) { updateElapsed(); statusTimer = setInterval(updateElapsed, 100); }
+  else { $('boot-elapsed').textContent = ''; $('boot-preview').hidden = true; }
+  if (bad) $('kernel-logs').open = true;
+};
+setStatus('Loading kernel…', false, true);
+
+let V = '', bugs = [];
+try {
+  const response = await fetch('data.json', { cache: 'no-store' });
+  if (!response.ok) throw new Error(`HTTP ${response.status}`);
+  ({ version: V, bugs } = await response.json());
+}
+catch (e) { setStatus('data.json failed: ' + e.message, true); }
+
+// ---- reproduced bugs: a static catalog ----
+{
+  const link = (text, href) => { const a = document.createElement('a'); a.textContent = text; a.href = href; return a; };
+  const tbody = $('bugs').querySelector('tbody');
+  // Two columns, like the table in the kSTEP README: everything about the bug on the left, the plot on the right.
+  const line = (label, ...nodes) => { const div = document.createElement('div'); if (label) { const b = document.createElement('b'); b.textContent = label + ': '; div.append(b); } div.append(...nodes); return div; };
+  for (const b of bugs) {
+    const tr = tbody.insertRow();
+    const info = tr.insertCell();
+    const title = document.createElement('b'); title.textContent = b.name; info.append(line('', title));
+    if (b.driver_url) info.append(line('Driver', link(b.name + '.c', b.driver_url)));
+    if (b.fixes.length) info.append(line('Fix', ...b.fixes.flatMap((x, i) => i ? [', ', link(x.label, x.url)] : [link(x.label, x.url)])));
+    const pl = tr.insertCell(); if (b.plot) { const img = document.createElement('img'); img.src = b.plot; img.alt = `${b.name}: buggy vs fixed`; img.loading = 'lazy'; img.onerror = () => img.remove(); pl.append(img); }
+  }
+}
+const { BIOS, runKstep } = await import(`./kstep.mjs?v=${V}`);
+
+// ---- session state ----
+const tasks = [];            // [{id, stat, alive}] in creation order; the driver names tasks 1, 2, .. by creation
+const timeline = [];         // per tick: [task on CPU 1, task on CPU 2, ...] (0 = idle)
+const balances = [];         // trace events: {tick: column, cpu: dst_cpu, pid: task (migrate only), src, domain}
+let ncpus = 1;
+let cpuRecords = new Map();
+const labelOf = (pid) => String(pid);
+const ms = (ns) => ns === undefined ? '' : (ns / 1e6).toFixed(1);
+// Colours are fixed per creation order, so a task keeps its colour in the timeline after it exits.
+const colorOf = (pid) => { const i = tasks.findIndex(t => t.id === pid); return i < 0 ? 'gray' : `hsl(${(i * 67) % 360}, 60%, 50%)`; };   // comma syntax: Safari's canvas parser
+
+// ---- machine: sockets x clusters x cores x threads over CPUs 1..N (CPU 0 stays kSTEP's own) ----
+// kSTEP's spec is LEVEL=group|group;... with every online CPU in exactly one group per level.
+// Threads of a core form an SMT group, cores of a cluster a CLS group, and a socket is both
+// the MC (shared last-level cache) and the PKG group; capacity is per core (its threads match).
+const MAX_CPUS = 8;
+const DIMS = ['sockets', 'clusters', 'cores', 'threads'];
+let machine = { sockets: 1, clusters: 1, cores: 2, threads: 2, caps: [] };   // what the VM booted with
+const nCpus = (m) => m.sockets * m.clusters * m.cores * m.threads;
+const socketOf = (m, cpu) => Math.floor((cpu - 1) / (m.clusters * m.cores * m.threads));
+const clusterOf = (m, cpu) => Math.floor((cpu - 1) / (m.cores * m.threads));
+const coreOf = (m, cpu) => Math.floor((cpu - 1) / m.threads);
+const groupSpec = (m, id) => { const g = []; for (let c = 1; c <= nCpus(m); c++) (g[id(m, c)] ??= []).push(c); return ['0', ...g.map(l => l.join(','))].join('|'); };
+const topoSpec = (m) => `SMT=${groupSpec(m, coreOf)};CLS=${groupSpec(m, clusterOf)};MC=${groupSpec(m, socketOf)};PKG=${groupSpec(m, socketOf)}`;
+
+// ---- timeline: fixed-width columns, a band per CPU, a row per task that has run there ----
+const CELL = 8, LABEL_W = 48, ROW = 16, BAND_GAP = 6;
+const scroller = $('scroll');
+let follow = true;
+scroller.onscroll = () => { follow = scroller.scrollLeft + scroller.clientWidth >= scroller.scrollWidth - 2; };
+function draw() {
+  const rows = Array.from({ length: ncpus }, () => []);   // rows[cpu] = pids in order of first appearance (ran or migrated in)
+  const seen = (cpu, pid) => { if (pid && !rows[cpu].includes(pid)) rows[cpu].push(pid); };
+  timeline.forEach((t, tick) => {
+    for (const b of balances) if (b.tick === tick && b.pid && b.cpu >= 1 && b.cpu <= ncpus) seen(b.cpu - 1, b.pid);
+    t.forEach((pid, cpu) => seen(cpu, pid));
+  });
+  const bandH = (cpu) => Math.max(1, rows[cpu].length) * ROW + BAND_GAP;
+  const H = rows.reduce((a, _, cpu) => a + bandH(cpu), 0) + 16;
+  canvas.style.height = `${H}px`;
+  const ctx = canvas.getContext('2d'), dpr = devicePixelRatio || 1, W = canvas.clientWidth;
+  canvas.width = W * dpr; canvas.height = H * dpr; ctx.scale(dpr, dpr);
+  ctx.clearRect(0, 0, W, H);
+  const visible = Math.floor((W - LABEL_W - 4) / CELL);
+  $('spacer').style.width = `${Math.max(timeline.length * CELL + LABEL_W, W)}px`;
+  if (follow) scroller.scrollLeft = scroller.scrollWidth;
+  const first = Math.max(0, Math.min(Math.round(scroller.scrollLeft / CELL), timeline.length - visible));
+  const last = Math.min(timeline.length, first + visible);
+  const fg = getComputedStyle(document.body).color;
+  ctx.textBaseline = 'middle';
+  let y = 2; layout = { first, bands: [] };
+  for (let cpu = 0; cpu < ncpus; cpu++) {
+    layout.bands.push({ top: y, bottom: y + bandH(cpu) - BAND_GAP, rows: rows[cpu] });
+    ctx.font = 'bold 11px system-ui'; ctx.fillStyle = fg; ctx.globalAlpha = 0.8; ctx.fillText(`cpu${cpu + 1}`, 2, y + ROW / 2); ctx.globalAlpha = 1;
+    ctx.fillStyle = 'rgba(128, 128, 128, 0.2)';          // idle stretches (no color-mix: canvas parsers vary)
+    for (let c = first; c < last; c++) if (!timeline[c][cpu]) ctx.fillRect(LABEL_W + (c - first) * CELL, y, CELL - 1, bandH(cpu) - BAND_GAP);
+    ctx.font = '11px system-ui';
+    rows[cpu].forEach((pid, r) => {
+      const ry = y + r * ROW, label = labelOf(pid);
+      ctx.fillStyle = fg; ctx.globalAlpha = 0.7; ctx.fillText(label, LABEL_W - 4 - ctx.measureText(label).width, ry + ROW / 2); ctx.globalAlpha = 1;
+      ctx.fillStyle = colorOf(pid);
+      for (let c = first; c < last; c++) if (timeline[c][cpu] === pid) ctx.fillRect(LABEL_W + (c - first) * CELL, ry + 1, CELL - 1, ROW - 2);
+    });
+    // balancing marks: a bar at the left edge of a task's row where it migrated in; a dashed
+    // hairline through the band where this CPU's balancer looked for work
+    for (const b of balances) if (b.cpu === cpu + 1 && b.tick >= first && b.tick < last) {
+      const x = LABEL_W + (b.tick - first) * CELL;
+      if (b.pid) {
+        const r = rows[cpu].indexOf(b.pid);
+        if (r >= 0) { ctx.fillStyle = fg; ctx.fillRect(x, y + r * ROW + 1, 2, ROW - 2); }
+      } else {   // an event of the whole CPU: a dashed hairline through the band
+        ctx.strokeStyle = fg; ctx.globalAlpha = 0.45; ctx.setLineDash([2, 2]);
+        ctx.beginPath(); ctx.moveTo(x + CELL / 2, y); ctx.lineTo(x + CELL / 2, y + bandH(cpu) - BAND_GAP); ctx.stroke();
+        ctx.setLineDash([]); ctx.globalAlpha = 1;
+      }
+    }
+    y += bandH(cpu);
+    if (cpu < ncpus - 1) {   // separator, heaviest between sockets, then clusters, cores, siblings
+      const diff = (f) => f(machine, cpu + 1) !== f(machine, cpu + 2), w = diff(socketOf) ? 3 : diff(clusterOf) ? 2 : diff(coreOf) ? 1 : 0;
+      ctx.strokeStyle = fg; ctx.globalAlpha = [0.15, 0.4, 0.7, 0.9][w]; ctx.lineWidth = [1, 1, 2, 3][w];
+      ctx.beginPath(); ctx.moveTo(0, y - BAND_GAP / 2); ctx.lineTo(W, y - BAND_GAP / 2); ctx.stroke(); ctx.globalAlpha = 1; ctx.lineWidth = 1;
+    }
+  }
+  ctx.fillStyle = fg; ctx.globalAlpha = 0.5; ctx.font = '10px system-ui';   // tick numbers every 10 columns
+  for (let c = first - (first % 10); c < first + visible; c += 10) if (c >= first) ctx.fillText(String(c), LABEL_W + (c - first) * CELL, H - 6);
+  ctx.globalAlpha = 1;
+}
+// hover: what happened on this CPU in this tick (native tooltip)
+let layout = { first: 0, bands: [] };
+canvas.addEventListener('mousemove', (e) => {
+  const rect = canvas.getBoundingClientRect(), x = e.clientX - rect.left, yy = e.clientY - rect.top;
+  const tick = layout.first + Math.floor((x - LABEL_W) / CELL), cpu = layout.bands.findIndex(b => yy >= b.top && yy < b.bottom);
+  if (x < LABEL_W || tick < 0 || tick >= timeline.length || cpu < 0) { canvas.title = ''; return; }
+  const pid = timeline[tick][cpu], lines = [`tick ${tick}, cpu${cpu + 1}: ${pid ? labelOf(pid) + ' running' : 'idle'}`];
+  for (const b of balances) if (b.tick === tick && b.cpu === cpu + 1)
+    lines.push(b.pid ? `${labelOf(b.pid)} migrated in from cpu${b.src}` : `balancer ran${b.domain ? ` (${b.domain} domain)` : ''}`);
+  canvas.title = lines.join('\n');
+});
+addEventListener('resize', draw);
+scroller.addEventListener('scroll', draw);
+canvas.addEventListener('wheel', (e) => { e.preventDefault(); scroller.scrollLeft += (e.deltaX || e.deltaY); }, { passive: false });
+
+// ---- machine form: the four counts and a drawing of the result, with a capacity select per core ----
+const formMachine = () => ({ ...Object.fromEntries(DIMS.map(k => [k, +$(k).value])),
+                             caps: [...$('machine').querySelectorAll('select')].map(s => +s.value) });
+function drawMachine(caps) {
+  if (!validCpuForm()) return;
+  const m = formMachine(); m.caps = caps;
+  const box = $('machine'); box.replaceChildren();
+  let cpu = 1, k = 0, ncore = 0;
+  for (let so = 0; so < m.sockets; so++) {
+    const sock = document.createElement('div'); sock.className = 'socket';
+    const sh = document.createElement('header'); sh.textContent = `socket ${so + 1}`; sock.append(sh);
+    const clusters = document.createElement('div'); clusters.className = 'clusters';
+    for (let cl = 0; cl < m.clusters; cl++, k++) {
+      const cluster = document.createElement('div'); cluster.className = 'cluster';
+      const head = document.createElement('header'); head.append(`cluster ${k + 1}`); cluster.append(head);
+      const cores = document.createElement('div'); cores.className = 'cores';
+      for (let i = 0; i < m.cores; i++, ncore++) {
+        const core = document.createElement('div'); core.className = 'core';
+        const ch = document.createElement('header'); ch.append(`core ${ncore + 1}`);
+        const cap = document.createElement('select'); cap.title = `Capacity of core ${ncore + 1}`; cap.setAttribute('aria-label', cap.title);
+        cap.append(new Option('1024', 1024), new Option('768', 768), new Option('512', 512), new Option('256', 256));
+        cap.value = caps[ncore] ?? 1024; cap.onchange = checkDirty; ch.append(cap); core.append(ch);
+        const threads = document.createElement('div'); threads.className = 'threads';
+        for (let t = 0; t < m.threads; t++) { const th = document.createElement('span'); th.textContent = `cpu${cpu++}`; threads.append(th); }
+        core.append(threads); cores.append(core);
+      }
+      cluster.append(cores); clusters.append(cluster);
+    }
+    sock.append(clusters); box.append(sock);
+  }
+  checkDirty();
+}
+// Highlight Restart while the form differs from the machine the VM booted with.
+const capsOf = (m) => Array.from({ length: m.sockets * m.clusters * m.cores }, (_, i) => m.caps[i] ?? 1024).join();
+function checkDirty() {
+  const f = formMachine(), dirty = DIMS.some(k => f[k] !== machine[k]) || capsOf(f) !== capsOf(machine);
+  $('boot').classList.toggle('primary', dirty);
+  $('discard-cpus').disabled = !dirty;
+  $('cpu-draft').textContent = dirty ? '· unapplied changes' : '';
+  $('boot').title = dirty ? 'the form differs from the running VM: reboot with this machine (reloads the page)' : 'reboot the VM with this machine (reloads the page)';
+}
+function validCpuForm() {
+  const valid = DIMS.every(k => $(k).validity.valid && $(k).value !== '');
+  const count = valid ? nCpus(formMachine()) : 0;
+  const error = !valid ? 'Use whole numbers within the limits shown in each field.' : count > MAX_CPUS ? `Choose at most ${MAX_CPUS} CPUs.` : '';
+  $('cpu-hint').textContent = error;
+  $('cpu-hint').className = error ? 'hint bad' : 'hint';
+  $('boot').disabled = !!error;
+  $('ncpus-label').textContent = valid ? `${count} CPUs` : 'Invalid layout';
+  checkDirty();
+  return !error;
+}
+function setCpuDraft(m) {
+  for (const k of DIMS) $(k).value = m[k];
+  drawMachine(m.caps ?? []);
+}
+function renderCpus() {
+  const cores = machine.sockets * machine.clusters * machine.cores;
+  $('running-cpus').textContent = `· ${ncpus} CPU${ncpus === 1 ? '' : 's'} · ${cores} core${cores === 1 ? '' : 's'} · ${machine.threads} thread${machine.threads === 1 ? '' : 's'}/core`;
+  for (let cpu = 1; cpu <= ncpus; cpu++) {
+    const r = cpuRecords.get(cpu), capacity = r?.capacity ?? machine.caps[coreOf(machine, cpu)] ?? 1024;
+    const tb = $('cpu-stats').tBodies[0];
+    let tr = tb.rows[cpu - 1];
+    if (!tr) {
+      tr = tb.insertRow();
+      for (let i = 0; i < 9; i++) tr.insertCell();
+      tr.cells[0].textContent = `cpu${cpu}`;
+    }
+    const values = [capacity,
+      !r ? '—' : r.idle ? 'idle' : r.current ? r.current : 'system task', r?.nr_running ?? '—', r?.cfs_util_avg ?? '—',
+      r?.cfs_load_avg ?? '—', r?.cfs_runnable_avg ?? '—', r?.min_vruntime === undefined ? '—' : ms(r.min_vruntime), r?.nr_switches ?? '—'];
+    values.forEach((v, i) => tr.cells[i + 1].textContent = v);
+
+  }
+}
+// The machine reaches the kernel as kSTEP's topology=/capacity= boot parameters.
+function cpuParams(m) {
+  const caps = [];
+  for (let c = 1; c <= nCpus(m); c++) { const cap = m.caps[coreOf(m, c)] ?? 1024; if (cap !== 1024) caps.push(`${c}=${cap}`); }
+  return { topology: topoSpec(m), capacity: caps.join(',') };
+}
+
+// ---- task table: rows are created once and updated in place (no rebuild, no flicker) ----
+const rowOf = new Map();
+const AFF = 4, NICE = 5, POL = 6, GRP = 12, ACT = 13;   // columns holding controls
+const AFF_TITLE = 'CPUs the task may run on, e.g. 1-2,4';
+// A row's controls are inputs and views at once: the user types into them, but the same
+// settings get changed behind their back -- a scenario's setup script sends driver lines
+// directly, and a cgroup's cpuset narrows a task's CPUs -- so the kernel's value has to be
+// able to flow back in. Skip a control the user is in the middle of: focused, or with an edit
+// still in flight. A rejected edit keeps `pending`, so it stays on screen to be corrected
+// rather than being silently replaced.
+const sync = (el, v) => {
+  if (v === undefined || document.activeElement === el || el.dataset.pending) return;
+  el.value = v;
+};
+// Send a control's value as `<verb> <value>`; the value is read when the event fires.
+const onSet = (el, verb) => el.onchange = () => {
+  const v = el.value;
+  el.dataset.pending = '1';
+  enqueue(async () => {
+    const r = await cmd(`${verb} ${v}`);
+    el.classList.toggle('bad', !!r.error);
+    if (r.error) return setStatus(`${verb.split(' ')[0]}: ${r.error}`, true);
+    await refresh();
+    delete el.dataset.pending;
+  });
+};
+// One task's row, created on first sight and updated in place. Per task rather than per
+// table, so a record can be shown the moment it arrives.
+function renderTask(t) {
+  const tb = $('tasks').querySelector('tbody');
+  let tr = rowOf.get(t.id);
+  if (!t.alive) { if (tr) { tr.remove(); rowOf.delete(t.id); } return; }
+  if (!tr) {
+    tr = tb.insertRow(); rowOf.set(t.id, tr);
+    for (let i = 0; i < 14; i++) tr.insertCell();
+    tr.cells[ACT].style.whiteSpace = 'nowrap';
+    tr.cells[0].style.background = colorOf(t.id); tr.cells[0].style.width = '.8rem';
+    const nice = document.createElement('input'); nice.type = 'number'; nice.min = -20; nice.max = 19; nice.value = 0; nice.style.width = '2.9rem';
+    onSet(nice, `nice ${t.id}`);
+    tr.cells[NICE].append(nice);
+    // scheduling class; real-time ones run at one fixed priority in the driver
+    const pol = document.createElement('select'); pol.title = 'scheduling class';
+    pol.replaceChildren(...['normal', 'batch', 'idle', 'fifo', 'rr'].map(v => new Option(v, v)));
+    onSet(pol, `policy ${t.id}`);
+    tr.cells[POL].append(pol);
+    // affinity as a cpulist ("1-2,4"), passed to the kernel as is; it validates
+    const aff = document.createElement('input'); aff.style.width = '3.6rem'; aff.title = AFF_TITLE;
+    aff.onkeydown = (e) => { if (e.key === 'Enter') aff.blur(); };   // Enter or leaving the box applies
+    aff.onchange = () => {
+      const want = aff.value.replace(/\s+/g, '');   // the driver splits on spaces
+      aff.dataset.pending = '1';
+      enqueue(async () => {
+        const r = await cmd(`affinity ${t.id} ${want}`);
+        aff.classList.toggle('bad', !!r.error);
+        aff.title = r.error ? `affinity: ${r.error}` : AFF_TITLE;   // the status line is shared with the console
+        if (r.error) return setStatus(`affinity: ${r.error}`, true);
+        await refresh();
+        delete aff.dataset.pending;
+      });
+    };
+    aff.oninput = () => { aff.classList.remove('bad'); aff.title = AFF_TITLE; };
+    tr.cells[AFF].append(aff);
+    // cgroup: a select over the root and the cgroups created so far
+    const grp = document.createElement('select'); grp.title = 'cgroup of the task';
+    onSet(grp, `attach ${t.id}`);
+    tr.cells[GRP].append(grp);
+    // pause / wake (label follows the task's state) and kill
+    const pause = document.createElement('button'); pause.textContent = 'pause';
+    pause.onclick = () => enqueue(() => cmd(`${pause.textContent} ${t.id}`).then(refresh));
+    const kill = document.createElement('button'); kill.textContent = 'kill'; kill.title = 'ask the task to exit';
+    kill.onclick = () => enqueue(() => cmd(`kill ${t.id}`).then(refresh));
+    tr.cells[ACT].append(pause, ' ', kill);
+  }
+  const s = t.stat ?? {};
+  sync(tr.cells[NICE].firstElementChild, s.nice);
+  sync(tr.cells[POL].firstElementChild, s.policy);
+  sync(tr.cells[AFF].firstElementChild, s.cpus);
+  // the cgroup select offers the root and every cgroup created so far; rebuilding its options
+  // clears the selection, so set it from the kernel afterwards
+  if (s.cgroup !== undefined && !groups.has(s.cgroup) && s.cgroup !== '/') groups.set(s.cgroup, {});
+  const grp = tr.cells[GRP].firstElementChild, want = groupPaths();
+  if ([...grp.options].map(o => o.value).join() !== want.join())
+    grp.replaceChildren(...want.map(g => new Option(g, g)));
+  sync(grp, s.cgroup);
+  if (s.state !== undefined) tr.cells[ACT].firstElementChild.textContent = s.state === 'running' || s.state === 'runnable' ? 'pause' : 'wake';
+  [t.id, s.state ?? '', s.cpu, undefined, undefined, undefined, s.weight, ms(s.sum_exec_runtime), ms(s.vruntime), ms(s.deadline), ms(s.slice)]
+    .forEach((v, i) => { if (v === undefined) return; const text = String(v); if (tr.cells[i + 1].textContent !== text) tr.cells[i + 1].textContent = text; });
+}
+
+// A task record, from `top` or `task <n>`: show it now, and note that this snapshot
+// mentioned the task (see refresh).
+function applyTask(o) {
+  const t = tasks.find((t) => t.id === o.task);
+  if (!t) return;
+  mentioned.add(o.task);
+  t.stat = o; t.alive = true;
+  renderTask(t);
+}
+
+// ---- cgroups: a tree under the root "/" (path -> {weight, cpus}); the table lists the root
+// and every cgroup created in this session, indented by depth, with a "child" button per row ----
+const groups = new Map();
+let ngroups = 0;
+async function newGroup(parent) {
+  const path = `${parent === '/' ? '' : parent}/g${++ngroups}`;
+  const r = await cmd(`cgroup-create ${path}`);
+  if (!r.error) { groups.set(path, { weight: 100, cpus: `1-${ncpus}` }); renderGroups(); await refresh(); }
+}
+const groupPaths = () => ['/', ...[...groups.keys()].sort()];
+function renderGroups() {
+  const tb = $('groups').querySelector('tbody');
+  for (const path of groupPaths()) {
+    const g = groups.get(path) ?? {};
+    let tr = [...tb.rows].find(r => r.dataset.path === path);
+    if (!tr) {
+      tr = tb.insertRow([...tb.rows].filter(r => r.dataset.path < path).length); tr.dataset.path = path;
+      for (let i = 0; i < 5; i++) tr.insertCell();
+      const depth = path === '/' ? 0 : path.split('/').length - 1;
+      tr.cells[0].textContent = path; tr.cells[0].style.paddingLeft = `${0.5 + depth}rem`;
+      if (path !== '/') {
+        const w = document.createElement('input'); w.type = 'number'; w.min = 1; w.max = 10000; w.value = g.weight ?? 100; w.style.width = '4rem';
+        w.onchange = () => enqueue(async () => { const r = await cmd(`cgroup-weight ${path} ${w.value}`); if (!r.error) g.weight = +w.value; else setStatus(`cgroup: ${r.error}`, true); });
+        tr.cells[1].append(w);
+        const c = document.createElement('input'); c.value = g.cpus ?? `1-${ncpus}`; c.style.width = '3.6rem'; c.title = 'cpuset.cpus, e.g. 1-2,4';
+        c.onkeydown = (e) => { if (e.key === 'Enter') c.blur(); };
+        c.onchange = () => enqueue(async () => { const r = await cmd(`cgroup-cpus ${path} ${c.value.replace(/\s+/g, '')}`); c.classList.toggle('bad', !!r.error); if (!r.error) { g.cpus = c.value; await refresh(); } else setStatus(`cgroup: ${r.error}`, true); });
+        tr.cells[2].append(c);
+      }
+      const child = document.createElement('button'); child.textContent = 'add child'; child.title = `create a cgroup under ${path}`;
+      child.onclick = () => enqueue(() => newGroup(path));
+      tr.cells[4].append(child);
+    }
+    const members = tasks.filter(t => t.alive && t.stat?.cgroup === path).map(t => t.id).join(', ');
+    if (tr.cells[3].textContent !== members) tr.cells[3].textContent = members;
+  }
+}
+
+// ---- transport: one command in flight at a time, replies in order ----
+let send = null; const waiters = [];
+const LOG_MAX = 2000;   // lines kept in the transcript
+const append = (text, cls) => {
+  const span = document.createElement('span'); if (cls) span.className = cls; span.textContent = text + '\n'; log.append(span);
+  if (log.childElementCount > LOG_MAX) log.firstElementChild.remove();
+  log.scrollTop = log.scrollHeight;
+};
+function cmd(line) {
+  return new Promise(resolve => { waiters.push(resolve); if (line !== null) { append('> ' + line); send(line); } })
+    .then(reply => { append(JSON.stringify(reply), reply.error ? 'err' : ''); return reply; });
+}
+// `top` answers one {"type":"task",...} record per live task and then its reply. Records are
+// shown the moment they arrive (applyTask); a task of ours the snapshot never mentioned has
+// exited -- the one thing that cannot be known before the reply lands.
+let mentioned = new Set();
+async function refresh() {
+  mentioned = new Set();
+  cpuRecords = new Map();
+  const reply = await cmd('top');
+  if (reply.error) throw new Error(reply.error);
+  for (const t of tasks) if (t.alive && !mentioned.has(t.id)) { t.alive = false; renderTask(t); }
+  renderGroups(); renderCpus();   // not draw(): the timeline is a function of the ticks so far
+}
+// A step is a tick followed by a `top`: the task each CPU is running is the tick's timeline
+// column, taken from the "cpu" records' `current`.
+async function step() {
+  const r = await cmd('tick');
+  if (r.error) return;
+  await refresh();
+  timeline.push(Array.from({ length: ncpus }, (_, c) => cpuRecords.get(c + 1)?.current ?? 0));
+  draw();
+}
+async function create() {
+  const r = await cmd('create');
+  if (!r.error) { tasks.push({ id: r.task, alive: true }); await refresh(); }
+}
+// UI actions run one after another on a queue; buttons stay enabled, nothing is dropped.
+let queue = Promise.resolve();
+const enqueue = (fn) => { queue = queue.then(fn).catch(e => setStatus('error: ' + e.message, true)); return queue; };
+
+// ---- clock: the ticks/s box drives it; 0 stops it, the step button stops it and ticks once ----
+let timer = 0;
+function schedule() {
+  clearTimeout(timer); timer = 0;
+  const rate = +$('speed').value || 0;
+  if (send && rate > 0) timer = setTimeout(() => enqueue(step).then(schedule), 1000 / rate);
+}
+$('speed').onchange = schedule;
+$('step').onclick = () => { $('speed').value = 0; schedule(); enqueue(() => step(true)); };
+$('create').onclick = () => enqueue(create);
+
+// ---- boot ----
+// The configuration lives in the URL, so it can be shared, and the VM boots as soon as the page
+// loads: ?tasks=5 initial tasks, ?sockets=1&clusters=1&cores=2&threads=2 the machine, and
+// ?cap=1024,512 one capacity per core. QEMU never exits under Emscripten, so Restart reloads
+// the page with the new query, which ends the current VM and boots the next one.
+// Scenarios: a machine, a number of tasks, a setup script run after boot (verbs as in the
+// driver; tasks are 1, 2, .. in creation order as in the driver, * means all; `tick N`), and what to look for.
+const SCENARIOS = {
+  free: { title: 'Default', machine: { sockets: 1, clusters: 1, cores: 2, threads: 2 }, tasks: 5, steps: [],
+    text: 'Five equal tasks on two cores with two threads each. Change nice values and affinities, pause and wake tasks, and watch the scheduler react.' },
+  rr: { title: 'Round robin', machine: { sockets: 1, clusters: 1, cores: 1, threads: 1 }, tasks: 3, steps: [],
+    text: 'Three equal tasks on one CPU. EEVDF runs them in turn, one slice each, and the pattern repeats; runtime and vruntime grow at the same rate for all three.' },
+  nice: { title: 'Weighted round robin', machine: { sockets: 1, clusters: 1, cores: 1, threads: 1 }, tasks: 3, steps: ['nice 1 -5', 'nice 3 5'],
+    text: 'One CPU, three tasks at nice -5, 0 and 5 (weights 3121, 1024, 335). CPU time is shared by weight: task 1 (nice -5) gets about three slices for each one of task 2\u2019s, task 3 (nice 5) about a third. Compare the runtime column; vruntime still advances evenly, because it is runtime divided by weight.' },
+  two: { title: 'Two CPUs', machine: { sockets: 1, clusters: 1, cores: 2, threads: 1 }, tasks: 6, steps: [],
+    text: 'Six equal tasks on two equal CPUs. Wakeup placement at creation leaves five on cpu1 and one on cpu2. The periodic balancer then moves one task at a time, roughly every 140 ticks, until the split is 3 : 3. Balancing is slow and stepwise, not instant; compare Big and little cores, where it stops earlier on purpose.' },
+  balance: { title: 'Load balancing', machine: { sockets: 1, clusters: 1, cores: 2, threads: 1 }, tasks: 4, steps: ['affinity * 1', 'tick 10', 'affinity * 1-2'],
+    text: 'Four tasks start pinned to cpu1 while cpu2 idles; after ten ticks they may run on either CPU. cpu2\u2019s balancer (dashed marks) looks for work at each balance interval and after a while pulls two tasks over in one go (bars at the start of their slices). Nothing moves immediately: balancing is periodic, not instant.' },
+  groups: { title: 'Cgroup fairness', machine: { sockets: 1, clusters: 1, cores: 1, threads: 1 }, tasks: 4, steps: ['cgroup-create /a', 'cgroup-create /b', 'attach 1 /a', 'attach 2 /b', 'attach 3 /b', 'attach 4 /b'],
+    text: 'One CPU, four equal tasks: task 1 alone in cgroup /a, the other three together in /b. Fairness is applied between cgroups first, then within: task 1 gets half the CPU, the three others a sixth each. Set /b\u2019s weight to 300 in the Cgroups table and all four become equal.' },
+  little: { title: 'Big and little cores', machine: { sockets: 1, clusters: 1, cores: 2, threads: 1, caps: [1024, 512] }, tasks: 6, steps: [],
+    text: 'The same six tasks, but cpu2 has half the capacity of cpu1. Placement again starts at 5 : 1. The balancer moves one task to the little core after a couple of hundred ticks and then stops at 4 : 2, matching the 2 : 1 capacity ratio; on equal CPUs (Two CPUs) it would continue to 3 : 3. Load is balanced per unit of capacity, not per task.' },
+};
+const params = new URLSearchParams(location.search);
+const clamp = (el, v) => Math.min(+el.max, Math.max(+el.min, Number.isFinite(v) ? Math.trunc(v) : +el.value));
+const scenario = SCENARIOS[params.get('scenario')] ?? (params.has('sockets') ? null : SCENARIOS.free);
+// one tab per scenario; the running one is highlighted (none when the machine below was
+// changed and restarted by hand)
+for (const [k, sc] of Object.entries(SCENARIOS)) {
+  const b = document.createElement('button'); b.textContent = sc.title;
+  b.classList.toggle('active', SCENARIOS[k] === scenario);
+  if (SCENARIOS[k] === scenario) b.setAttribute('aria-current', 'page');
+  b.onclick = () => location.replace(`${location.pathname}?scenario=${k}`);
+  $('scenarios').append(b);
+}
+$('scenario-text').textContent = scenario ? scenario.text : 'A machine of your own, booted with five tasks.';
+const ntasks = scenario ? scenario.tasks : Math.min(16, Math.max(0, (Number.isNaN(parseInt(params.get('tasks'))) ? 5 : parseInt(params.get('tasks')))));
+for (const k of DIMS) $(k).value = scenario ? scenario.machine[k] : clamp($(k), parseInt(params.get(k)));
+machine = scenario ? { ...scenario.machine, caps: scenario.machine.caps ?? [] }
+                   : { ...formMachine(), caps: (params.get('cap') ?? '').split(',').filter(Boolean).map(v => [256, 512, 768, 1024].includes(+v) ? +v : 1024) };
+if (nCpus(machine) > MAX_CPUS) machine = { sockets: 1, clusters: 1, cores: 2, threads: 2, caps: [] };
+for (const k of DIMS) $(k).value = machine[k];
+ncpus = nCpus(machine);   // the VM's CPU count
+drawMachine(machine.caps);
+for (const k of DIMS) $(k).oninput = () => drawMachine(formMachine().caps);
+$('discard-cpus').onclick = () => setCpuDraft(machine);
+if (location.hash === '#cpu-editor') $('cpu-editor').open = true;
+const CPU_PRESETS = {
+  'Single CPU': { sockets: 1, clusters: 1, cores: 1, threads: 1 },
+  'Multicore': { sockets: 1, clusters: 1, cores: 4, threads: 1 },
+  'SMT': { sockets: 1, clusters: 1, cores: 2, threads: 2 },
+  'Big / little': { sockets: 1, clusters: 1, cores: 2, threads: 1, caps: [1024, 512] },
+};
+for (const [name, m] of Object.entries(CPU_PRESETS)) {
+  const b = document.createElement('button'); b.textContent = name;
+  b.onclick = () => setCpuDraft(m); $('cpu-presets').append(b);
+}
+renderCpus();
+$('boot').onclick = () => {
+  if (!validCpuForm()) return;
+  const m = formMachine();
+  location.replace(`${location.pathname}?tasks=${scenario ? 5 : ntasks}&${DIMS.map(k => `${k}=${m[k]}`).join('&')}&cap=${m.caps}`);
+};
+
+async function boot() {
+  try {
+    setStatus('Downloading kernel…', false, true);
+    const get = (u) => fetch(u).then(r => { if (!r.ok) throw new Error(`${u}: HTTP ${r.status}`); return r.arrayBuffer(); });
+    const [kernel, rootfs, { default: Module }, ...bios] = await Promise.all([
+      get(`images/cli/kernel?v=${V}`), get(`images/cli/rootfs.cpio?v=${V}`),   // ?v busts the browser cache after a restage
+      import(`./qemu/qemu-system-x86_64.js?v=${V}`), ...BIOS.map(f => get(`qemu/${f}?v=${V}`)),
+    ]);
+    setStatus('Booting kernel…', false, true);
+    const r = await runKstep(Module, {
+      files: { kernel, rootfs, bios: Object.fromEntries(BIOS.map((f, i) => [f, bios[i]])) },
+      driver: 'cli', smp: ncpus + 1, mem: 64, cli: true, params: cpuParams(machine),
+      locateFile: (f) => `qemu/${f}?v=${V}`,
+      onLine: (ch, line) => {
+        if (ch === 'console') {
+          const atBottom = con.scrollHeight - con.scrollTop - con.clientHeight < 40;
+          con.append(line + '\n'); if (atBottom) con.scrollTop = con.scrollHeight;
+          if (startup && line.trim()) { $('boot-preview').textContent = line; $('boot-preview').hidden = false; }
+          if (line.includes('Kernel panic')) { setStatus('Kernel panic', true); $('speed').value = 0; schedule(); }
+        }
+        else if (ch === 'jsonl') {
+          // one ordered stream: command replies interleaved with trace events ("type"); a failed
+          // command replies with "error"
+          const o = JSON.parse(line);
+          if (!('type' in o)) waiters.shift()?.(o);   // a reply (events carry "type")
+          else if (o.type === 'cpu') { cpuRecords.set(o.cpu, o); append(line); }
+          else if (o.type === 'task') { append(line); applyTask(o); }   // a record: shown right away
+          else if (o.type === 'load_balance' || o.type === 'migrate') {
+            append(line, 'event');
+            // the kernel's logical timestamp is the tick the event happened in (tick N -> column N-1);
+            // arrival order is not reliable, the balancer's lines can trail the tick reply
+            balances.push({ tick: Math.max(0, o.timestamp - 1), cpu: o.dst_cpu, pid: o.type === 'migrate' ? o.task : 0, src: o.src_cpu, domain: o.name });
+          }
+        }
+      },
+    });
+    send = r.send;
+    await cmd(null);   // the driver's ready line
+    setStatus('Preparing tasks…', false, true);
+    for (let i = 0; i < ntasks; i++) await create();
+    // scenario setup: driver lines as they are, except "tick N" and "*" for every task
+    for (const line of scenario?.steps ?? []) {
+      const [verb, who, ...rest] = line.split(' ');
+      if (verb === 'tick') { for (let i = 0; i < +who; i++) await step(); continue; }
+      if (verb.startsWith('cgroup-')) { const r = await cmd(line); if (!r.error && verb === 'cgroup-create') groups.set(who, {}); continue; }
+      for (const t of who === '*' ? tasks : [{ id: who }]) await cmd(`${verb} ${t.id} ${rest.join(' ')}`.trim());
+      await refresh();
+    }
+    await refresh();   // also populate CPU stats when booting without any tasks
+    renderGroups();   // the cgroup tree (root row) once the VM is up
+    draw();
+    setStatus('Kernel ready');
+    $('clock').hidden = false; $('create').hidden = false;
+    schedule();          // start the clock at the speed in the box
+  } catch (e) { setStatus('error: ' + e.message, true); }
+}
+// coi-serviceworker reloads the page once on the first visit to get SharedArrayBuffer; boot
+// only on the isolated page. Hard reloads bypass service workers, hence the fallback message.
+if (V && crossOriginIsolated) boot();
+else if (V) { setStatus('Preparing browser for kernel startup…', false, true);
+  setTimeout(() => setStatus('This page needs SharedArrayBuffer, which the service worker provides. Do a normal reload (hard reloads bypass it); private browsing may block it entirely.', true), 3000); }
+draw();
+</script>
+</body>
+</html>

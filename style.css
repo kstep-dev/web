@@ -1,0 +1,36 @@
+/* index.html (playground). */
+[hidden] { display: none !important; }
+:root { color-scheme: light dark; }
+body { margin: 0 auto; padding: 0 1rem 3rem; max-width: 60rem; font: 15px/1.5 system-ui, sans-serif; }
+header { display: flex; justify-content: space-between; align-items: baseline; gap: 1rem; flex-wrap: wrap; }
+h1 { font-size: 1.6rem; margin: 1.2rem 0 .2rem; }
+nav { display: flex; align-items: baseline; white-space: nowrap; }
+nav a { margin-left: 1rem; }
+h2 { flex-wrap: wrap; gap: .4rem; font-size: 1rem; margin: 1.4rem 0 .4rem; border-bottom: 1px solid GrayText; padding-bottom: .15rem; display: flex; justify-content: space-between; align-items: baseline; }
+h2 span { font-weight: normal; font-size: .85rem; color: GrayText; display: flex; gap: .5rem; align-items: center; flex-wrap: wrap; }
+h2 label { display: flex; gap: .35rem; align-items: center; }
+button, input, select { font: inherit; font-size: .92rem; padding: .25rem .7rem; border: 1px solid color-mix(in srgb, GrayText 55%, transparent); border-radius: .3rem; background: Canvas; color: CanvasText; }
+button { cursor: pointer; }
+button:hover:not(:disabled) { background: color-mix(in srgb, GrayText 12%, Canvas); }
+button:disabled { cursor: default; opacity: .5; }
+button.primary { background: AccentColor; color: AccentColorText; border-color: transparent; }
+button.primary:hover:not(:disabled) { filter: brightness(1.1); }
+table { border-collapse: collapse; width: 100%; font-size: .9rem; }
+th, td { padding: .2rem .5rem; border-bottom: 1px solid color-mix(in srgb, GrayText 40%, transparent); }
+th { font-weight: 600; }
+td button { padding: 0 .5rem; font-size: .8rem; }
+#status { color: GrayText; font-weight: normal; font-variant-numeric: tabular-nums; margin-left: .4rem; }
+#status.ok { color: green; }
+#status.bad { color: crimson; }
+#panes { display: grid; grid-template-columns: 1fr 1fr; gap: .8rem; margin-top: 1.4rem; }
+@media (max-width: 800px) { #panes { grid-template-columns: 1fr; } }
+.pane { min-width: 0; }   /* let grid cells shrink; long lines scroll inside the pane */
+.pane h3 { font-size: .8rem; font-weight: 600; margin: 0 0 .25rem; display: flex; justify-content: space-between; align-items: center; }
+pre { margin: 0; height: 14rem; overflow: auto; max-width: 100%; padding: .5rem .7rem; border: 1px solid GrayText; font: 12px/1.35 ui-monospace, SFMono-Regular, Menlo, monospace; white-space: pre; }
+figure { text-align: center; margin: .8rem 0; }
+figure img { max-width: 100%; max-height: 22rem; }
+.hint { color: GrayText; }
+
+/* Keep wide data inside a keyboard-scrollable region on small screens. */
+.table-scroll { max-width: 100%; overflow-x: auto; }
+:focus-visible { outline: 2px solid Highlight; outline-offset: 2px; }
